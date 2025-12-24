@@ -3114,118 +3114,70 @@ case 'yts':
 case 'ytsearch':
 case 'search': {
   try {
+    // Add reaction to indicate processing
     await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } });
     
+    // Get search query from message
     const args = body.slice(config.PREFIX.length).trim().split(' ');
-    args.shift();
+    args.shift(); // Remove the command itself
     const query = args.join(' ');
     
     if (!query) {
       await socket.sendMessage(from, {
-        text: "❌ *YouTube Search*\n\n*Usage:*\n`.yts <search query>`\n\n*Example:*\n`.yts Adele Hello`",
-        buttons: [
-          {
-            buttonId: `${config.PREFIX}help yts`,
-            buttonText: { displayText: '📖 Help' },
-            type: 1
-          }
-        ]
+        text: "❌ *What should I search?*\n\nExample:\n.yts Adele Hello"
       }, { quoted: msg });
       await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
       break;
     }
     
+    // Send searching message
     await socket.sendMessage(from, {
-      text: `🔍 *Searching YouTube...*\n\n*Query:* \`${query}\``
+      text: "🔍 *Searching YouTube…*\nHold tight, summoning the algorithm gods."
     }, { quoted: msg });
     
     try {
       const result = await yts(query);
-      const videos = result.videos.slice(0, 10); // Get up to 10 results
+      const videos = result.videos.slice(0, 5);
       
       if (!videos.length) {
         await socket.sendMessage(from, {
-          text: `😵 *No Results Found*\n\nCouldn't find videos for: \`${query}\``,
-          buttons: [
-            {
-              buttonId: `${config.PREFIX}yts`,
-              buttonText: { displayText: '🔄 Try Again' },
-              type: 1
-            }
-          ]
+          text: "😵 *No results found.*\nYouTube shrugged."
         }, { quoted: msg });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
         break;
       }
       
-      // Create list message for better organization
-      const listMessage = {
-        text: `🎬 *YouTube Search Results*\n\n*Found ${videos.length} videos for:* \`${query}\``,
-        footer: 'caseyrhodes YouTube Search | Select an option below',
-        title: 'YouTube Search Results',
-        buttonText: 'Select Video',
-        sections: [
-          {
-            title: `📺 Top ${Math.min(videos.length, 10)} Results`,
-            rows: videos.slice(0, 10).map((v, i) => ({
-              title: `${i + 1}. ${v.title.substring(0, 60)}${v.title.length > 60 ? '...' : ''}`,
-              description: `⏱ ${v.timestamp} | 👁 ${v.views.toLocaleString()} | 📺 ${v.author.name}`,
-              rowId: `${config.PREFIX}play ${v.url}`
-            }))
-          },
-          {
-            title: '🔧 Search Actions',
-            rows: [
-              {
-                title: '🔄 Search Again',
-                description: 'Search for different videos',
-                rowId: `${config.PREFIX}yts`
-              },
-              {
-                title: '📋 View as Text',
-                description: 'Get results as text message',
-                rowId: `${config.PREFIX}ytslist ${query}`
-              }
-            ]
-          }
-        ]
-      };
+      let text = `🎬 *YouTube Search Results*\n\n`;
       
-      await socket.sendMessage(from, listMessage);
+      videos.forEach((v, i) => {
+        text +=
+          `*${i + 1}. ${v.title}*\n` +
+          `⏱ ${v.timestamp} | 👁 ${v.views.toLocaleString()}\n` +
+          `📺 ${v.author.name}\n` +
+          `🔗 ${v.url}\n\n`;
+      });
+      
+      text += `✨ Powered by *caseyrhodes YouTube Engine*`;
+      
+      await socket.sendMessage(from, {
+        image: { url: videos[0].thumbnail },
+        caption: text
+      }, { quoted: msg });
+      
       await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
       
     } catch (err) {
-      console.error('YouTube API error:', err);
-      
       await socket.sendMessage(from, {
-        text: `❌ *Search Error*\n\n*Query:* \`${query}\`\n*Error:* \`${err.message}\``,
-        buttons: [
-          {
-            buttonId: `${config.PREFIX}yts`,
-            buttonText: { displayText: '🔄 Retry' },
-            type: 1
-          },
-          {
-            buttonId: `${config.PREFIX}menu`,
-            buttonText: { displayText: '📋 Menu' },
-            type: 1
-          }
-        ]
+        text: `❌ *Search Error:*\n${err.message}`
       }, { quoted: msg });
       await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
   } catch (error) {
     console.error('YouTube search error:', error);
     await socket.sendMessage(from, {
-      text: "❌ *System Error*\n\nFailed to process search request.",
-      buttons: [
-        {
-          buttonId: `${config.PREFIX}report`,
-          buttonText: { displayText: '⚠️ Report Issue' },
-          type: 1
-        }
-      ]
+      text: "❌ *Failed to process YouTube search*"
     }, { quoted: msg });
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
   }
   break;
 }
