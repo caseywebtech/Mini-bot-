@@ -4,7 +4,6 @@ const path = require('path');
 const { exec } = require('child_process');
 const router = express.Router();
 const fetch = require('node-fetch');
-const { translate } = require('@vitalets/google-translate-api');
 const pino = require('pino');
 const yts = require("yt-search");
 const cheerio = require('cheerio');
