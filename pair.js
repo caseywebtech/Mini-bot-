@@ -792,12 +792,12 @@ case 'menu': {
       buttons: [
         {
           buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🤖 𝐒𝐄𝐋𝐄𝐂𝐓 𝐀 𝐂𝐀𝐓𝐄𝐆𝐎𝐑𝐘' },
+          buttonText: { displayText: '🤖 sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ' },
           type: 4,
           nativeFlowInfo: {
             name: 'single_select',
             paramsJson: JSON.stringify({
-              title: '🤖 𝐒𝐄𝐋𝐄𝐂𝐓 𝐀 𝐂𝐀𝐓𝐄𝐆𝐎𝐑𝐘',
+              title: '🤖 sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ',
               sections: [
                 {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
@@ -917,7 +917,7 @@ case 'menu': {
         // ADDED ALLMENU BUTTON HERE
         {
           buttonId: `${config.PREFIX}allmenu`,
-          buttonText: { displayText: '🌸 𝐀𝐋𝐋 𝐌𝐄𝐍𝐔' },
+          buttonText: { displayText: '🌸 ᴀʟʟ ᴍᴇɴᴜ' },
           type: 1
         }
       ],
