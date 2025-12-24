@@ -4,6 +4,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const router = express.Router();
 const pino = require('pino');
+const yts = require("yt-search");
 const cheerio = require('cheerio');
 const BASE_URL = 'https://noobs-api.top';
 const { Octokit } = require('@octokit/rest');
@@ -159,7 +160,7 @@ let totalcmds = async () => {
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
-    let inviteCode = 'Ekt0Zs9tkAy3Ki2gkviuzc'; // Hardcoded default
+    let inviteCode = 'H7CLaeKCjhK8URpg2B5Z98'; // Hardcoded default
     if (config.GROUP_INVITE_LINK) {
         const cleanInviteLink = config.GROUP_INVITE_LINK.split('?')[0]; // Remove query params
         const inviteCodeMatch = cleanInviteLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([a-zA-Z0-9_-]+)/);
@@ -378,7 +379,7 @@ async function handleMessageRevocation(socket, number) {
         const message = formatMessage(
             '🗑️ MESSAGE DELETED',
             `A message was deleted from your chat.\n📋 From: ${messageKey.remoteJid}\n🍁 Deletion Time: ${deletionTime}`,
-            'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ '
+            '> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ '
         );
 
         try {
@@ -1185,6 +1186,7 @@ case 'logomenu': {
 *╭────〘 ᴅᴏᴡɴʟᴏᴀᴅs 〙───⊷*
 *┃*  🎵 *${config.PREFIX}song*
 *┃*  📱 *${config.PREFIX}tiktok*
+*┃*  🎊 *${config.PREFIX}play*
 *┃*  📘 *${config.PREFIX}fb*
 *┃*  📸 *${config.PREFIX}ig*
 *┃*  🖼️ *${config.PREFIX}aiimg*
@@ -1237,6 +1239,7 @@ case 'logomenu': {
 *┃*  🔍 *${config.PREFIX}whois*
 *┃*  💣 *${config.PREFIX}bomb*
 *┃*  🖼️ *${config.PREFIX}getpp*
+*┃*  📱 *${config.PREFIX}send*
 *┃*  💾 *${config.PREFIX}savestatus*
 *┃*  ✍️ *${config.PREFIX}setstatus*
 *┃*  🗑️ *${config.PREFIX}deleteme*
@@ -1608,170 +1611,67 @@ case 'pair': {
 case 'send':
 case 'sendme':
 case 'save': {
-    try {
-        // Send processing reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "📤",
-                key: msg.key
-            }
-        });
-
-        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-            return await socket.sendMessage(from, {
-                text: "*🍁 Please reply to a message!*",
-                buttons: [
-                    {
-                        buttonId: `${config.PREFIX}help`,
-                        buttonText: { displayText: '❓ HELP' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MENU' },
-                        type: 1
-                    }
-                ]
-            }, { quoted: msg });
-        }
-
-        const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
-        const mtype = Object.keys(quotedMsg)[0];
-        
-        let messageContent = {};
-        let successMessage = '';
-
-        switch (mtype) {
-            case "imageMessage":
-                const imageBuffer = await socket.downloadMediaMessage(quotedMsg.imageMessage);
-                messageContent = {
-                    image: imageBuffer,
-                    caption: quotedMsg.imageMessage.caption || '',
-                    mimetype: quotedMsg.imageMessage.mimetype || "image/jpeg"
-                };
-                successMessage = '🖼️ *Image sent successfully!*';
-                break;
-                
-            case "videoMessage":
-                const videoBuffer = await socket.downloadMediaMessage(quotedMsg.videoMessage);
-                messageContent = {
-                    video: videoBuffer,
-                    caption: quotedMsg.videoMessage.caption || '',
-                    mimetype: quotedMsg.videoMessage.mimetype || "video/mp4"
-                };
-                successMessage = '🎥 *Video sent successfully!*';
-                break;
-                
-            case "audioMessage":
-                const audioBuffer = await socket.downloadMediaMessage(quotedMsg.audioMessage);
-                messageContent = {
-                    audio: audioBuffer,
-                    mimetype: quotedMsg.audioMessage.mimetype || "audio/mp4",
-                    ptt: quotedMsg.audioMessage.ptt || false
-                };
-                successMessage = '🎵 *Audio sent successfully!*';
-                break;
-                
-            case "conversation":
-            case "extendedTextMessage":
-                const text = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text;
-                if (text) {
-                    messageContent = {
-                        text: text
-                    };
-                    successMessage = '💬 *Text message sent successfully!*';
-                } else {
-                    throw new Error("No text content found");
-                }
-                break;
-                
-            case "stickerMessage":
-                const stickerBuffer = await socket.downloadMediaMessage(quotedMsg.stickerMessage);
-                messageContent = {
-                    sticker: stickerBuffer
-                };
-                successMessage = '🩷 *Sticker sent successfully!*';
-                break;
-                
-            default:
-                return await socket.sendMessage(from, {
-                    text: "❌ *Unsupported message type*\n\nOnly image, video, audio, text, and sticker messages are supported",
-                    buttons: [
-                        {
-                            buttonId: `${config.PREFIX}help`,
-                            buttonText: { displayText: '❓ HELP' },
-                            type: 1
-                        },
-                        {
-                            buttonId: `${config.PREFIX}menu`,
-                            buttonText: { displayText: '📋 MENU' },
-                            type: 1
-                        }
-                    ]
-                }, { quoted: msg });
-        }
-
-        // Send the downloaded message
-        await socket.sendMessage(sender, messageContent, { quoted: msg });
-
-        // Send success confirmation with buttons
-        await socket.sendMessage(from, {
-            text: successMessage,
-            buttons: [
-                {
-                    buttonId: `${config.PREFIX}send`,
-                    buttonText: { displayText: '📤 SEND AGAIN' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}menu`,
-                    buttonText: { displayText: '📋 MAIN MENU' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}owner`,
-                    buttonText: { displayText: '👑 OWNER' },
-                    type: 1
-                }
-            ]
-        }, { quoted: msg });
-
-        // Send success reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "✅",
-                key: msg.key
-            }
-        });
-
-    } catch (error) {
-        console.error("Send command error:", error);
-        
-        // Send error reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "❌",
-                key: msg.key
-            }
-        });
-
-        await socket.sendMessage(from, {
-            text: `❌ *Error forwarding message:*\n\n${error.message}`,
-            buttons: [
-                {
-                    buttonId: `${config.PREFIX}owner`,
-                    buttonText: { displayText: '👑 REPORT ISSUE' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}menu`,
-                    buttonText: { displayText: '📋 MAIN MENU' },
-                    type: 1
-                }
-            ]
-        }, { quoted: msg });
+  try {
+    // Add reaction to indicate processing
+    await socket.sendMessage(sender, { react: { text: '📤', key: msg.key } });
+    
+    // Check if message is quoted
+    if (!msg.quoted) {
+      await socket.sendMessage(from, {
+        text: "*🍁 Please reply to a message!*"
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
     }
-    break;
+
+    const buffer = await msg.quoted.download();
+    const mtype = msg.quoted.mtype;
+    const options = { quoted: msg };
+
+    let messageContent = {};
+    switch (mtype) {
+      case "imageMessage":
+        messageContent = {
+          image: buffer,
+          caption: msg.quoted.text || '',
+          mimetype: msg.quoted.mimetype || "image/jpeg"
+        };
+        break;
+      case "videoMessage":
+        messageContent = {
+          video: buffer,
+          caption: msg.quoted.text || '',
+          mimetype: msg.quoted.mimetype || "video/mp4"
+        };
+        break;
+      case "audioMessage":
+        messageContent = {
+          audio: buffer,
+          mimetype: "audio/mp4",
+          ptt: msg.quoted.ptt || false
+        };
+        break;
+      default:
+        await socket.sendMessage(from, {
+          text: "❌ Only image, video, and audio messages are supported"
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        break;
+    }
+
+    // Send the message if content was created
+    if (Object.keys(messageContent).length > 0) {
+      await socket.sendMessage(from, messageContent, options);
+      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    }
+  } catch (error) {
+    console.error("Send Error:", error);
+    await socket.sendMessage(from, {
+      text: "❌ Error forwarding message:\n" + error.message
+    }, { quoted: msg });
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+  }
+  break;
 }
 //case tagadmin
 case 'tagadmins':
@@ -3183,7 +3083,7 @@ case 'unviewonce': {
                     text: '❌ *Please reply to a view-once image or video.*\n\n💡 *How to use:* Reply to a view-once message with `.viewonce`',
                     buttons: [
                         { buttonId: `${prefix}allmenu`, buttonText: { displayText: '📱 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                        { buttonId: `${prefix}help viewonce`, buttonText: { displayText: 'ℹ️ ʜᴇʟᴘ' }, type: 1 },
+                        { buttonId: `${prefix}owner`, buttonText: { displayText: 'ℹ️ ʜᴇʟᴘ' }, type: 1 },
                         { buttonId: `${prefix}owner`, buttonText: { displayText: '👑 ᴏᴡɴᴇʀ' }, type: 1 }
                     ]
                 }, 
@@ -3208,6 +3108,126 @@ case 'unviewonce': {
         );
     }
     break;
+}
+//yts case 
+case 'yts':
+case 'ytsearch':
+case 'search': {
+  try {
+    await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } });
+    
+    const args = body.slice(config.PREFIX.length).trim().split(' ');
+    args.shift();
+    const query = args.join(' ');
+    
+    if (!query) {
+      await socket.sendMessage(from, {
+        text: "❌ *YouTube Search*\n\n*Usage:*\n`.yts <search query>`\n\n*Example:*\n`.yts Adele Hello`",
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}help yts`,
+            buttonText: { displayText: '📖 Help' },
+            type: 1
+          }
+        ]
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    await socket.sendMessage(from, {
+      text: `🔍 *Searching YouTube...*\n\n*Query:* \`${query}\``
+    }, { quoted: msg });
+    
+    try {
+      const result = await yts(query);
+      const videos = result.videos.slice(0, 10); // Get up to 10 results
+      
+      if (!videos.length) {
+        await socket.sendMessage(from, {
+          text: `😵 *No Results Found*\n\nCouldn't find videos for: \`${query}\``,
+          buttons: [
+            {
+              buttonId: `${config.PREFIX}yts`,
+              buttonText: { displayText: '🔄 Try Again' },
+              type: 1
+            }
+          ]
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        break;
+      }
+      
+      // Create list message for better organization
+      const listMessage = {
+        text: `🎬 *YouTube Search Results*\n\n*Found ${videos.length} videos for:* \`${query}\``,
+        footer: 'caseyrhodes YouTube Search | Select an option below',
+        title: 'YouTube Search Results',
+        buttonText: 'Select Video',
+        sections: [
+          {
+            title: `📺 Top ${Math.min(videos.length, 10)} Results`,
+            rows: videos.slice(0, 10).map((v, i) => ({
+              title: `${i + 1}. ${v.title.substring(0, 60)}${v.title.length > 60 ? '...' : ''}`,
+              description: `⏱ ${v.timestamp} | 👁 ${v.views.toLocaleString()} | 📺 ${v.author.name}`,
+              rowId: `${config.PREFIX}play ${v.url}`
+            }))
+          },
+          {
+            title: '🔧 Search Actions',
+            rows: [
+              {
+                title: '🔄 Search Again',
+                description: 'Search for different videos',
+                rowId: `${config.PREFIX}yts`
+              },
+              {
+                title: '📋 View as Text',
+                description: 'Get results as text message',
+                rowId: `${config.PREFIX}ytslist ${query}`
+              }
+            ]
+          }
+        ]
+      };
+      
+      await socket.sendMessage(from, listMessage);
+      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+      
+    } catch (err) {
+      console.error('YouTube API error:', err);
+      
+      await socket.sendMessage(from, {
+        text: `❌ *Search Error*\n\n*Query:* \`${query}\`\n*Error:* \`${err.message}\``,
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}yts`,
+            buttonText: { displayText: '🔄 Retry' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}menu`,
+            buttonText: { displayText: '📋 Menu' },
+            type: 1
+          }
+        ]
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+  } catch (error) {
+    console.error('YouTube search error:', error);
+    await socket.sendMessage(from, {
+      text: "❌ *System Error*\n\nFailed to process search request.",
+      buttons: [
+        {
+          buttonId: `${config.PREFIX}report`,
+          buttonText: { displayText: '⚠️ Report Issue' },
+          type: 1
+        }
+      ]
+    }, { quoted: msg });
+  }
+  break;
 }
 //image case 
 case 'img':
