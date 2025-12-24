@@ -3,6 +3,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const { exec } = require('child_process');
 const router = express.Router();
+const fetch = require('node-fetch');
+const { translate } = require('@vitalets/google-translate-api');
 const pino = require('pino');
 const yts = require("yt-search");
 const cheerio = require('cheerio');
@@ -815,7 +817,7 @@ case 'menu': {
                     { title: "ℹ️ ʙᴏᴛ ɪɴғᴏ", description: "Get bot information", id: `${config.PREFIX}active` },
                     { title: "🔰sᴇᴛᴘᴘ", description: "set your own profile", id: `${config.PREFIX}setpp` },
                     { title: "📋 ᴍᴇɴᴜ", description: "Show this menu", id: `${config.PREFIX}menu` },
-                    { title: "📜 ᴀʟʟ ᴍᴇɴᴜ", description: "List all commands (text)", id: `${config.PREFIX}allmenu` },
+                    { title: "📜 ϙᴜʀᴀɴ", description: "List all your quran by number", id: `${config.PREFIX}quran` },
                     { title: "🔮sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${config.PREFIX}ss` },
                     { title: "💌ғᴇᴛᴄʜ", description: "get url comtent", id: `${config.PREFIX}get` },  
                     { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${config.PREFIX}ping` },
@@ -1131,6 +1133,8 @@ case 'logomenu': {
  ╭─『 🌐 *ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
 *┃*  🟢 *${config.PREFIX}alive*
 *┃*  🎀 *${config.PREFIX}image*
+*┃*  📜 *${config.PREFIX}quran*
+*┃*  📜 *${config.PREFIX}surah*
 *┃*  🐑 *${config.PREFIX}wallpaper*
 *┃*  📊 *${config.PREFIX}bot_stats*
 *┃*  🧑‍💻 *${config.PREFIX}webzip*
@@ -1187,8 +1191,10 @@ case 'logomenu': {
 *┃*  🎵 *${config.PREFIX}song*
 *┃*  📱 *${config.PREFIX}tiktok*
 *┃*  🎊 *${config.PREFIX}play*
+*┃*  📜 *${config.PREFIX}yts*
 *┃*  📘 *${config.PREFIX}fb*
 *┃*  📸 *${config.PREFIX}ig*
+*┃*  🎊 *${config.PREFIX}gitclone*
 *┃*  🖼️ *${config.PREFIX}aiimg*
 *┃*  👀 *${config.PREFIX}viewonce*
 *┃*  🐣 *${config.PREFIX}vv*
@@ -1606,6 +1612,200 @@ case 'pair': {
     }
     
     break;
+}
+//quran case
+case 'quran':
+case 'surah': {
+  try {
+    await socket.sendMessage(sender, { react: { text: '🤍', key: msg.key } });
+    
+    // Get surah number/name from message
+    const args = body.slice(config.PREFIX.length).trim().split(' ');
+    args.shift(); // Remove command
+    const surahInput = args[0];
+    
+    if (!surahInput) {
+      await socket.sendMessage(from, {
+        text: `📖 *Quran Surah*\n\n*Usage:* \`${config.PREFIX}quran <surah-number>\`\n*Example:* \`${config.PREFIX}quran 1\`\n\nType \`${config.PREFIX}surahmenu\` for getting Surah numbers`,
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}surahmenu`,
+            buttonText: { displayText: '📖 Surah List' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}quran 1`,
+            buttonText: { displayText: '📜 Surah 1' },
+            type: 1
+          }
+        ]
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Send processing message
+    await socket.sendMessage(from, {
+      text: `🕋 *Fetching Quran Surah...*\n\nPlease wait while we retrieve Surah ${surahInput}`
+    }, { quoted: msg });
+    
+    try {
+      // Fetch surah list
+      const surahListRes = await fetch('https://quran-endpoint.vercel.app/quran');
+      const surahListData = await surahListRes.json();
+      const surahList = surahListData.data;
+      
+      // Find surah by number or name
+      const surahData = surahList.find(surah => 
+          surah.number === Number(surahInput) || 
+          surah.asma.ar.short.toLowerCase() === surahInput.toLowerCase() || 
+          surah.asma.en.short.toLowerCase() === surahInput.toLowerCase()
+      );
+      
+      if (!surahData) {
+        await socket.sendMessage(from, {
+          text: `❌ *Surah Not Found*\n\nCouldn't find surah with number or name "${surahInput}"\n\nUse \`${config.PREFIX}surahmenu\` to see available surahs.`,
+          buttons: [
+            {
+              buttonId: `${config.PREFIX}surahmenu`,
+              buttonText: { displayText: '📖 Surah Menu' },
+              type: 1
+            },
+            {
+              buttonId: `${config.PREFIX}quran 1`,
+              buttonText: { displayText: '🔄 Try Surah 1' },
+              type: 1
+            }
+          ]
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        break;
+      }
+      
+      // Fetch detailed surah data
+      const surahRes = await fetch(`https://quran-endpoint.vercel.app/quran/${surahData.number}`);
+      
+      if (!surahRes.ok) {
+        const errorData = await surahRes.json();
+        throw new Error(`API request failed: ${errorData.message || 'Unknown error'}`);
+      }
+      
+      const surahJson = await surahRes.json();
+      
+      // Translate tafsir to Urdu and English
+      let translatedTafsirUrdu, translatedTafsirEnglish;
+      
+      try {
+        // Using Promise.all for parallel translation
+        [translatedTafsirUrdu, translatedTafsirEnglish] = await Promise.all([
+          translate(surahJson.data.tafsir.id, { to: 'ur', autoCorrect: true }),
+          translate(surahJson.data.tafsir.id, { to: 'en', autoCorrect: true })
+        ]);
+      } catch (translateError) {
+        console.error('Translation error:', translateError);
+        // Use original text if translation fails
+        translatedTafsirUrdu = { text: surahJson.data.tafsir.id };
+        translatedTafsirEnglish = { text: surahJson.data.tafsir.id };
+      }
+      
+      // Create Quran surah message with buttons
+      const quranSurah = `
+🕋 *Quran: The Holy Book ♥️🌹قرآن مجید🌹♥️*
+
+📖 *Surah ${surahJson.data.number}: ${surahJson.data.asma.ar.long} (${surahJson.data.asma.en.long})*
+
+💫 *Type:* ${surahJson.data.type.en}
+✅ *Number of verses:* ${surahJson.data.ayahCount}
+
+⚡🔮 *Explanation (Urdu):*
+${translatedTafsirUrdu.text.substring(0, 800)}${translatedTafsirUrdu.text.length > 800 ? '...' : ''}
+
+⚡🔮 *Explanation (English):*
+${translatedTafsirEnglish.text.substring(0, 800)}${translatedTafsirEnglish.text.length > 800 ? '...' : ''}
+
+✨ *Powered by caseyrhodes*`;
+      
+      // Create message with image and buttons
+      const quranMessage = {
+        image: { url: `https://i.ibb.co/rG5M4Q1S/lordcasey.jpg` },
+        caption: quranSurah,
+        footer: 'Select an option below',
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}quran ${Number(surahInput) + 1}`,
+            buttonText: { displayText: '⏭️ Next Surah' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}quran ${Number(surahInput) - 1}`,
+            buttonText: { displayText: '⏮️ Previous' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}surahmenu`,
+            buttonText: { displayText: '📖 Surah List' },
+            type: 1
+          }
+        ]
+      };
+      
+      // Send Quran information
+      await socket.sendMessage(from, quranMessage, { quoted: msg });
+      
+      // Send audio recitation if available
+      if (surahJson.data.recitation && surahJson.data.recitation.full) {
+        await socket.sendMessage(from, {
+          audio: { url: surahJson.data.recitation.full },
+          mimetype: 'audio/mpeg',
+          ptt: true,
+          caption: `🎧 *Audio Recitation*\nSurah ${surahJson.data.asma.en.long}`,
+          buttons: [
+            {
+              buttonId: `${config.PREFIX}quran ${surahInput}`,
+              buttonText: { displayText: '📖 View Again' },
+              type: 1
+            }
+          ]
+        }, { quoted: msg });
+      }
+      
+      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+      
+    } catch (error) {
+      console.error('Quran API error:', error);
+      
+      await socket.sendMessage(from, {
+        text: `❌ *Quran Service Error*\n\nFailed to fetch surah information.\n\nError: ${error.message}\n\nPlease try again later.`,
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}surahmenu`,
+            buttonText: { displayText: '📖 Try Another' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}menu`,
+            buttonText: { displayText: '🏠 Main Menu' },
+            type: 1
+          }
+        ]
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    
+  } catch (error) {
+    console.error('Quran command error:', error);
+    await socket.sendMessage(from, {
+      text: `❌ *System Error*\n\nCould not process Quran request.\n\n${error.message}`,
+      buttons: [
+        {
+          buttonId: `${config.PREFIX}menu`,
+          buttonText: { displayText: '🏠 Main Menu' },
+          type: 1
+        }
+      ]
+    }, { quoted: msg });
+  }
+  break;
 }
 ///status save case
 case 'send':
@@ -3108,6 +3308,101 @@ case 'unviewonce': {
         );
     }
     break;
+}
+//gitclone case 
+case 'gitclone':
+case 'git': {
+  try {
+    await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
+    
+    // Extract link from message
+    const args = body.slice(config.PREFIX.length).trim().split(' ');
+    args.shift(); // Remove command
+    const link = args[0];
+    
+    if (!link) {
+      await socket.sendMessage(from, {
+        text: `📎 *GitHub Repository Download*\n\n*Usage:* \`${config.PREFIX}gitclone <github-url>\`\n*Example:* \`${config.PREFIX}gitclone https://github.com/caseyweb/CASEYRHODES-XMD\``
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Validate GitHub URL
+    if (!/^https:\/\/github\.com\/[^\/]+\/[^\/]+/.test(link)) {
+      await socket.sendMessage(from, {
+        text: "❌ *Invalid GitHub URL.*\n\nPlease provide a valid GitHub repository link."
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Extract user and repo from URL
+    const match = link.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\.git)?/i);
+    if (!match) {
+      await socket.sendMessage(from, {
+        text: "❌ *Couldn't extract repository information from URL.*"
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    const user = match[1];
+    const repo = match[2];
+    const downloadURL = `https://api.github.com/repos/${user}/${repo}/zipball`;
+    
+    // Send downloading message
+    await socket.sendMessage(from, {
+      text: `📦 *Downloading Repository*\n\n👤 *User:* ${user}\n📁 *Repo:* ${repo}\n⬇️ *Downloading...*`
+    }, { quoted: msg });
+    
+    // Check if repository exists
+    const headCheck = await fetch(downloadURL, { method: "HEAD" });
+    
+    if (!headCheck.ok) {
+      await socket.sendMessage(from, {
+        text: "❌ *Failed to download repository.*\n\nRepository not found or inaccessible."
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Get filename from headers or generate one
+    const filenameHeader = headCheck.headers.get("content-disposition");
+    const fileName = filenameHeader 
+      ? filenameHeader.match(/filename="?(.+?)"?$/)?.[1] 
+      : `${repo}-${Date.now()}.zip`;
+    
+    // Create caption text
+    const captionText = `✅ *Repository Downloaded Successfully*\n\n👤 *User:* ${user}\n📁 *Repository:* ${repo}\n📦 *File:* ${fileName}`;
+    
+    // Send the zip file with newsletter context
+    await socket.sendMessage(from, {
+      document: { url: downloadURL },
+      fileName: fileName,
+      mimetype: 'application/zip',
+      caption: captionText,
+      contextInfo: {
+        forwardingScore: 1,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363420261263259@newsletter',
+          newsletterName: 'POWERED BY CASEYRHODES TECH',
+          serverMessageId: -1
+        }
+      }
+    });
+    
+    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    
+  } catch (error) {
+    console.error('Gitclone handler error:', error);
+    await socket.sendMessage(from, {
+      text: "❌ *System error processing gitclone command*"
+    }, { quoted: msg });
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+  }
+  break;
 }
 //yts case 
 case 'yts':
