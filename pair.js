@@ -333,16 +333,30 @@ async function setupStatusHandlers(socket) {
                 }
             }
            
-           // Auto-read function
-async function autoReadMessage(socket, message) {
-    try {
-        if (config.AUTO_READ === 'true' && message.key.remoteJid) {
-            await socket.sendReadReceipt(message.key.remoteJid, message.key.id);
-        }
-    } catch (error) {
-        console.error('Error in autoReadMessage:', error);
+    
+// Your main message handler function
+async function handleMessage(socket, msg) {
+  const { body, from, sender } = msg;
+  const prefix = config.PREFIX;
+  
+  // Check if message starts with prefix
+  if (!body.startsWith(prefix)) return;
+  
+  // Extract command
+  const command = body.slice(prefix.length).split(' ')[0].toLowerCase();
+  
+  // Mode check for private mode
+  if (config.MODE === 'private') {
+    const botNumber = await socket.decodeJid(socket.user.id);
+    const isCreator = [botNumber, config.OWNER_NUMBER + '@s.whatsapp.net'].includes(sender);
+    
+    if (!isCreator) {
+      await socket.sendMessage(from, {
+        text: "🔒 *BOT IS IN PRIVATE MODE*\n\nOnly owner can use commands."
+      }, { quoted: msg });
+      return;
     }
-}
+  }
             if (config.AUTO_LIKE_STATUS === 'true') {
                 const randomEmoji = config.AUTO_LIKE_EMOJI[Math.floor(Math.random() * config.AUTO_LIKE_EMOJI.length)];
                 let retries = config.MAX_RETRIES;
@@ -667,6 +681,82 @@ case 'alive': {
     }
     break;
 }
+case 'mode': {
+  try {
+    const botNumber = await socket.decodeJid(socket.user.id);
+    const isCreator = [botNumber, config.OWNER_NUMBER + '@s.whatsapp.net', config.OWNER_NUMBER].includes(sender);
+    
+    // Check if user is owner/creator
+    if (!isCreator) {
+      await socket.sendMessage(from, { 
+        text: "*📛 THIS IS AN OWNER COMMAND*\n\nOnly the bot owner can use this command."
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '⛔', key: msg.key } });
+      break;
+    }
+    
+    // Extract mode argument
+    const args = body.slice(config.PREFIX.length).trim().split(' ');
+    args.shift(); // Remove command
+    const modeArg = args[0] ? args[0].toLowerCase() : '';
+    
+    // Check if mode argument is provided
+    if (!modeArg) {
+      await socket.sendMessage(from, {
+        text: `⚙️ *Bot Mode Settings*\n\n*Current Mode:* ${config.MODE || 'public'}\n\n*Usage:*\n\`${config.PREFIX}mode public\` - Enable public mode\n\`${config.PREFIX}mode private\` - Enable private mode\n\n*Note:* Only bot owner can change modes.`
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Handle mode change
+    if (modeArg === 'public' || modeArg === 'private') {
+      if (modeArg === 'public') {
+        config.MODE = "public";
+        // If you have a Matrix.public property
+        if (socket.public !== undefined) socket.public = true;
+        
+        await socket.sendMessage(from, {
+          text: `✅ *Mode Changed to PUBLIC*\n\nBot is now available to everyone.`,
+          contextInfo: {
+            mentionedJid: [sender]
+          }
+        }, { quoted: msg });
+        
+        console.log(`Bot mode changed to PUBLIC by ${sender}`);
+        
+      } else if (modeArg === 'private') {
+        config.MODE = "private";
+        // If you have a Matrix.public property
+        if (socket.public !== undefined) socket.public = false;
+        
+        await socket.sendMessage(from, {
+          text: `🔒 *Mode Changed to PRIVATE*\n\nBot is now restricted to owner only.`,
+          contextInfo: {
+            mentionedJid: [sender]
+          }
+        }, { quoted: msg });
+        
+        console.log(`Bot mode changed to PRIVATE by ${sender}`);
+      }
+      
+      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+      
+    } else {
+      await socket.sendMessage(from, {
+        text: `❌ *Invalid Mode*\n\nPlease use:\n• \`${config.PREFIX}mode public\`\n• \`${config.PREFIX}mode private\`\n\n*Current Mode:* ${config.MODE || 'public'}`
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    
+  } catch (error) {
+    console.error('Mode command error:', error);
+    await socket.sendMessage(from, {
+      text: `❌ *Error changing mode:*\n${error.message}`
+    }, { quoted: msg });
+  }
+  break;
+}
 // Case: bot_stats
 // Case: bot_stats
 case 'session': {
@@ -774,7 +864,7 @@ case 'menu': {
 *╰──────────────────⊷*
 *\`Ξ ѕєlєct α cαtєgσrч вєlσw:\`*
 
-> ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ
+> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ
 `;
 
     // Common message context
@@ -783,7 +873,7 @@ case 'menu': {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: '120363420261263259@newsletter',
-            newsletterName: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
+            newsletterName: '͏ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
             serverMessageId: -1
         }
     };
@@ -794,12 +884,12 @@ case 'menu': {
       buttons: [
         {
           buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🤖 sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ' },
+          buttonText: { displayText: '🤖 SELECT A CATEGORY' },
           type: 4,
           nativeFlowInfo: {
             name: 'single_select',
             paramsJson: JSON.stringify({
-              title: '🤖 sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ',
+              title: '🤖 SELECT A CATEGORY',
               sections: [
                 {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
@@ -919,7 +1009,7 @@ case 'menu': {
         // ADDED ALLMENU BUTTON HERE
         {
           buttonId: `${config.PREFIX}allmenu`,
-          buttonText: { displayText: '🌸 ᴀʟʟ ᴍᴇɴᴜ' },
+          buttonText: { displayText: '🌸 ALL MENU' },
           type: 1
         }
       ],
