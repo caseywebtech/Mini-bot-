@@ -728,7 +728,7 @@ case 'info': {
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: '120363420261263259@newsletter',
-                    newsletterName: 'POWERED BY CASEYRHODES TECH',
+                    newsletterName: 'MINI BOT BY CASEYRHODES TECH',
                     serverMessageId: -1
                 }
             }
@@ -765,7 +765,7 @@ case 'menu': {
 *╰──────────────────⊷*
 *\`Ξ ѕєlєct α cαtєgσrч вєlσw:\`*
 
-> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ
+> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ ッ
 `;
 
     // Common message context
@@ -910,7 +910,7 @@ case 'menu': {
         // ADDED ALLMENU BUTTON HERE
         {
           buttonId: `${config.PREFIX}allmenu`,
-          buttonText: { displayText: '🌸 ALL MENU' },
+          buttonText: { displayText: '🧑‍💻 ALL MENU' },
           type: 1
         }
       ],
@@ -1197,6 +1197,7 @@ case 'logomenu': {
 *┃*  ➕ *${config.PREFIX}add*
 *┃*  🦶 *${config.PREFIX}kick*
 *┃*  🔓 *${config.PREFIX}open*
+*┃*  💠 *${config.PREFIX}leave*
 *┃*  🔒 *${config.PREFIX}close*
 *┃*  👑 *${config.PREFIX}promote*
 *┃*  😢 *${config.PREFIX}demote*
@@ -1604,69 +1605,76 @@ case 'pair': {
     break;
 }
 
-///status save case
-case 'send':
-case 'sendme':
-case 'save': {
+///case gitclone 
+case 'gitclone': {
   try {
-    // Add reaction to indicate processing
-    await socket.sendMessage(sender, { react: { text: '📤', key: msg.key } });
+    await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
     
-    // Check if message is quoted
-    if (!msg.quoted) {
+    const link = body.slice(config.PREFIX.length).trim().split(' ')[1];
+    
+    if (!link) {
       await socket.sendMessage(from, {
-        text: "*🍁 Please reply to a message!*"
+        text: `📦 *GitHub Download*\n\nUsage: \`${config.PREFIX}gitclone <url>\`\nExample: \`${config.PREFIX}gitclone https://github.com/caseyweb/CASEYRHODES-XMD\``
       }, { quoted: msg });
       await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
       break;
     }
-
-    const buffer = await msg.quoted.download();
-    const mtype = msg.quoted.mtype;
-    const options = { quoted: msg };
-
-    let messageContent = {};
-    switch (mtype) {
-      case "imageMessage":
-        messageContent = {
-          image: buffer,
-          caption: msg.quoted.text || '',
-          mimetype: msg.quoted.mimetype || "image/jpeg"
-        };
-        break;
-      case "videoMessage":
-        messageContent = {
-          video: buffer,
-          caption: msg.quoted.text || '',
-          mimetype: msg.quoted.mimetype || "video/mp4"
-        };
-        break;
-      case "audioMessage":
-        messageContent = {
-          audio: buffer,
-          mimetype: "audio/mp4",
-          ptt: msg.quoted.ptt || false
-        };
-        break;
-      default:
-        await socket.sendMessage(from, {
-          text: "❌ Only image, video, and audio messages are supported"
-        }, { quoted: msg });
-        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-        break;
+    
+    if (!link.includes("github.com")) {
+      await socket.sendMessage(from, {
+        text: "❌ Please provide a valid GitHub URL"
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
     }
-
-    // Send the message if content was created
-    if (Object.keys(messageContent).length > 0) {
-      await socket.sendMessage(from, messageContent, options);
-      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    
+    const match = link.match(/github\.com\/([^\/]+)\/([^\/]+)/i);
+    if (!match) {
+      await socket.sendMessage(from, {
+        text: "❌ Invalid GitHub URL format"
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
     }
-  } catch (error) {
-    console.error("Send Error:", error);
+    
+    const [, owner, repo] = match;
+    const cleanRepo = repo.replace(/.git$/, '');
+    const zipUrl = `https://api.github.com/repos/${owner}/${cleanRepo}/zipball`;
+    
+    // Quick processing message
     await socket.sendMessage(from, {
-      text: "❌ Error forwarding message:\n" + error.message
+      text: `⬇️ Downloading ${owner}/${cleanRepo}...`
     }, { quoted: msg });
-    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    
+    try {
+      const response = await fetch(zipUrl, { method: "HEAD" });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch (Status: ${response.status})`);
+      }
+      
+      await socket.sendMessage(from, {
+        document: { url: zipUrl },
+        fileName: `${cleanRepo}.zip`,
+        mimetype: "application/zip",
+        caption: `✅ *${owner}/${cleanRepo}*\n📦 Downloaded via caseyrhodes`
+      });
+      
+      await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+      
+    } catch (error) {
+      console.error("GitClone error:", error);
+      await socket.sendMessage(from, {
+        text: `❌ Download failed: ${error.message.includes("404") ? "Repository not found" : error.message}`
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    
+  } catch (error) {
+    console.error('Gitclone error:', error);
+    await socket.sendMessage(from, {
+      text: "❌ System error"
+    }, { quoted: msg });
   }
   break;
 }
@@ -6066,8 +6074,8 @@ case 'casey': {
         }
 
         const apis = [
-            `https://api.giftedtech.co.ke/api/ai/ai?apikey=gifted&q=${encodeURIComponent(q)}`,
-            `https://lance-frank-asta.onrender.com/api/gpt?q=${encodeURIComponent(q)}`
+            `https://lance-frank-asta.onrender.com/api/gpt?q=${encodeURIComponent(q)}`,
+            `https://vapis.my.id/api/openai?q=${encodeURIComponent(q)}`
         ];
 
         let response = null;
@@ -6359,7 +6367,77 @@ case 'profilepic': {
                     }
                     break;
                 }
+/// case leave 
 
+case 'leave': {
+  try {
+    // Add reaction immediately
+    await socket.sendMessage(sender, { react: { text: '👋', key: msg.key } });
+    
+    // Check if in a group
+    if (!from.endsWith('@g.us')) {
+      await socket.sendMessage(from, {
+        text: "❌ *This command can only be used in groups*",
+        buttons: [
+          {
+            buttonId: `${config.PREFIX}join`,
+            buttonText: { displayText: '👥 Join Group' },
+            type: 1
+          },
+          {
+            buttonId: `${config.PREFIX}menu`,
+            buttonText: { displayText: '📋 Menu' },
+            type: 1
+          }
+        ]
+      }, { quoted: msg });
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      break;
+    }
+    
+    // Send goodbye message
+    await socket.sendMessage(from, {
+      text: "👋 *Goodbye!*\n\nThanks for using caseyrhodes bot.\nBot is now leaving this group.",
+      footer: 'caseyrhodes Group Management'
+    });
+    
+    // Leave the group
+    await socket.groupLeave(from);
+    
+    console.log(`Bot left group: ${from}`);
+    
+  } catch (error) {
+    console.error('Leave group error:', error);
+    
+    // Send error message
+    let errorMsg = "❌ *Failed to leave group*\n\n";
+    
+    if (error.message.includes('not in group')) {
+      errorMsg += "• Bot is not in this group\n";
+      errorMsg += "• May have already been removed";
+    } else if (error.message.includes('permission')) {
+      errorMsg += "• Insufficient permissions\n";
+      errorMsg += "• Bot may not be admin";
+    } else {
+      errorMsg += `• Error: ${error.message}\n`;
+      errorMsg += "• Try removing bot manually";
+    }
+    
+    await socket.sendMessage(from, {
+      text: errorMsg,
+      buttons: [
+        {
+          buttonId: `${config.PREFIX}kickme`,
+          buttonText: { displayText: '🦶 Kick Bot' },
+          type: 1
+        }
+      ]
+    }, { quoted: msg });
+    
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+  }
+  break;
+}
                 // Case: kick - Remove a member from the group
                 case 'kick': {
                 await socket.sendMessage(sender, { react: { text: '🦶', key: msg.key } });
